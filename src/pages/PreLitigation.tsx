@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, Filter, Upload } from "lucide-react";
+import { Search, Filter, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import NewDisputeDialog from "@/components/NewDisputeDialog";
 
 export default function PreLitigation() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,10 +99,7 @@ export default function PreLitigation() {
           <h1 className="text-3xl font-bold text-foreground">Pre-Litigation Disputes</h1>
           <p className="mt-1 text-muted-foreground">Manage disputes before court filing</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Dispute
-        </Button>
+        <NewDisputeDialog />
       </div>
 
       <Card className="shadow-[var(--shadow-card)]">
