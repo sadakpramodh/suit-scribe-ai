@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus } from "lucide-react";
+import { Plus, Upload, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -44,13 +47,17 @@ const disputeSchema = z.object({
   replyDueDate: z.string().min(1, "Reply due date is required"),
   responsibleUser: z.string().min(1, "Responsible user is required").max(100),
   description: z.string().max(500).optional(),
+  documents: z.array(z.instanceof(File)).max(50, "Maximum 50 files allowed").optional(),
 });
 
 type DisputeFormValues = z.infer<typeof disputeSchema>;
 
 export default function NewDisputeDialog() {
   const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<DisputeFormValues>({
     resolver: zodResolver(disputeSchema),
@@ -66,14 +73,88 @@ export default function NewDisputeDialog() {
     },
   });
 
-  const onSubmit = (data: DisputeFormValues) => {
-    console.log("New dispute:", data);
-    toast({
-      title: "Dispute Created",
-      description: "The new dispute has been added successfully.",
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Validate file size (500MB max per file)
+    const maxSize = 500 * 1024 * 1024; // 500MB in bytes
+    const validFiles = files.filter(file => {
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 500MB limit`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
     });
-    setOpen(false);
-    form.reset();
+
+    const newFiles = [...selectedFiles, ...validFiles].slice(0, 50);
+    setSelectedFiles(newFiles);
+    
+    if (newFiles.length >= 50) {
+      toast({
+        title: "File limit reached",
+        description: "Maximum 50 files allowed",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
+  };
+
+  const uploadDocuments = async () => {
+    if (!user || selectedFiles.length === 0) return [];
+
+    const uploadedPaths: string[] = [];
+
+    for (const file of selectedFiles) {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from("documents")
+        .upload(fileName, file);
+
+      if (error) {
+        console.error("Upload error:", error);
+        throw error;
+      }
+
+      uploadedPaths.push(fileName);
+    }
+
+    return uploadedPaths;
+  };
+
+  const onSubmit = async (data: DisputeFormValues) => {
+    setUploading(true);
+    try {
+      // Upload documents if any
+      const documentPaths = await uploadDocuments();
+      
+      console.log({ ...data, documents: documentPaths });
+      
+      toast({
+        title: "Dispute Created",
+        description: `The new dispute has been added successfully${documentPaths.length > 0 ? ` with ${documentPaths.length} document(s)` : ""}.`,
+      });
+      
+      setOpen(false);
+      form.reset();
+      setSelectedFiles([]);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create dispute",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -221,6 +302,56 @@ export default function NewDisputeDialog() {
               )}
             />
 
+            <div className="space-y-2">
+              <Label>Documents (Max 50 files, 500MB each)</Label>
+              <div className="border-2 border-dashed rounded-lg p-4 hover:border-primary/50 transition-colors">
+                <input
+                  type="file"
+                  id="documents"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                  disabled={selectedFiles.length >= 50}
+                />
+                <label
+                  htmlFor="documents"
+                  className="flex flex-col items-center gap-2 cursor-pointer"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Click to upload documents
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedFiles.length}/50 files selected
+                  </span>
+                </label>
+              </div>
+
+              {selectedFiles.length > 0 && (
+                <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                    >
+                      <span className="truncate flex-1">{file.name}</span>
+                      <span className="text-xs text-muted-foreground mx-2">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
@@ -228,11 +359,15 @@ export default function NewDisputeDialog() {
                 onClick={() => {
                   setOpen(false);
                   form.reset();
+                  setSelectedFiles([]);
                 }}
+                disabled={uploading}
               >
                 Cancel
               </Button>
-              <Button type="submit">Create Dispute</Button>
+              <Button type="submit" disabled={uploading}>
+                {uploading ? "Creating..." : "Create Dispute"}
+              </Button>
             </div>
           </form>
         </Form>
