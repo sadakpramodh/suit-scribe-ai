@@ -44,6 +44,57 @@ export type Database = {
         }
         Relationships: []
       }
+      disputes: {
+        Row: {
+          company: string
+          created_at: string
+          description: string | null
+          dispute_type: string
+          document_paths: string[] | null
+          id: string
+          notice_date: string
+          notice_from: string
+          reply_due_date: string
+          responsible_user: string
+          status: string
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          description?: string | null
+          dispute_type: string
+          document_paths?: string[] | null
+          id?: string
+          notice_date: string
+          notice_from: string
+          reply_due_date: string
+          responsible_user: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          description?: string | null
+          dispute_type?: string
+          document_paths?: string[] | null
+          id?: string
+          notice_date?: string
+          notice_from?: string
+          reply_due_date?: string
+          responsible_user?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

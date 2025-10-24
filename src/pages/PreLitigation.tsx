@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter, Upload } from "lucide-react";
+import { Search, Filter, Upload, Trash2, FileText, Clock, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,78 +19,69 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import NewDisputeDialog from "@/components/NewDisputeDialog";
+import StatCard from "@/components/StatCard";
+import { useDisputes } from "@/hooks/useDisputes";
+import { format } from "date-fns";
 
 export default function PreLitigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { disputes, loading, deleteDispute, updateDisputeStatus } = useDisputes();
 
-  const disputes = [
-    {
-      id: "DIS-2024-001",
-      company: "Welspun Corp Ltd",
-      disputeType: "Arbitration",
-      value: 150,
-      noticeFrom: "Sahara Construction",
-      noticeDate: "2024-10-01",
-      replyDueDate: "2024-11-01",
-      status: "pending",
-      responsibleUser: "Adv. Sharma",
-      daysRemaining: 10,
-    },
-    {
-      id: "DIS-2024-002",
-      company: "Welspun Steel",
-      disputeType: "Court",
-      value: 45,
-      noticeFrom: "Vendor Logistics Pvt",
-      noticeDate: "2024-09-15",
-      replyDueDate: "2024-10-15",
-      status: "overdue",
-      responsibleUser: "Adv. Mehta",
-      daysRemaining: -7,
-    },
-    {
-      id: "DIS-2024-003",
-      company: "Welspun Enterprises",
-      disputeType: "Labour",
-      value: 20,
-      noticeFrom: "Workers Union",
-      noticeDate: "2024-10-10",
-      replyDueDate: "2024-11-10",
-      status: "active",
-      responsibleUser: "Adv. Patel",
-      daysRemaining: 19,
-    },
-    {
-      id: "DIS-2024-004",
-      company: "Welspun Corp Ltd",
-      disputeType: "International",
-      value: 200,
-      noticeFrom: "Global Trade Inc",
-      noticeDate: "2024-08-20",
-      replyDueDate: "2024-09-20",
-      status: "closed",
-      responsibleUser: "Adv. Kumar",
-      daysRemaining: 0,
-    },
-  ];
-
-  const getStatusVariant = (status: string): "active" | "pending" | "overdue" | "closed" => {
-    return status as "active" | "pending" | "overdue" | "closed";
+  const getStatusVariant = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      "Pending": "destructive",
+      "Under Review": "secondary",
+      "Response Sent": "default",
+      "Closed": "outline",
+    };
+    return variants[status] || "default";
   };
 
   const filteredDisputes = disputes.filter((dispute) => {
     const matchesSearch =
-      searchQuery === "" ||
       dispute.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dispute.noticeFrom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dispute.id.toLowerCase().includes(searchQuery.toLowerCase());
-    
+      dispute.dispute_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dispute.responsible_user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dispute.notice_from.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || dispute.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
+
+  const stats = {
+    totalValue: disputes.reduce((sum, d) => sum + d.value, 0),
+    byType: disputes.reduce((acc, d) => {
+      acc[d.dispute_type] = (acc[d.dispute_type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    byStatus: disputes.reduce((acc, d) => {
+      acc[d.status] = (acc[d.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading disputes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -123,157 +114,129 @@ export default function PreLitigation() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Under Review">Under Review</SelectItem>
+                  <SelectItem value="Response Sent">Response Sent</SelectItem>
+                  <SelectItem value="Closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Dispute ID</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Notice From</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Reply Due</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDisputes.map((dispute) => (
-                  <TableRow key={dispute.id} className="transition-colors hover:bg-muted/50">
-                    <TableCell className="font-medium">{dispute.id}</TableCell>
-                    <TableCell>{dispute.company}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{dispute.disputeType}</Badge>
-                    </TableCell>
-                    <TableCell>{dispute.noticeFrom}</TableCell>
-                    <TableCell className="font-semibold">₹{dispute.value}Cr</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm">
-                          {new Date(dispute.replyDueDate).toLocaleDateString('en-IN')}
-                        </p>
-                        {dispute.daysRemaining > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {dispute.daysRemaining} days left
-                          </p>
-                        )}
-                        {dispute.daysRemaining < 0 && (
-                          <p className="text-xs text-destructive">
-                            {Math.abs(dispute.daysRemaining)} days overdue
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(dispute.status)}>
-                        {dispute.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {dispute.responsibleUser}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-1">
-                          <Upload className="h-3 w-3" />
-                          Upload
-                        </Button>
-                      </div>
-                    </TableCell>
+          {filteredDisputes.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold">No disputes found</h3>
+              <p className="text-muted-foreground mt-2">
+                {searchQuery || statusFilter !== "all"
+                  ? "Try adjusting your search or filter criteria"
+                  : "Create your first dispute to get started"}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Notice From</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead>Reply Due</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredDisputes.map((dispute) => (
+                    <TableRow key={dispute.id} className="transition-colors hover:bg-muted/50">
+                      <TableCell className="font-medium">{dispute.company}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{dispute.dispute_type}</Badge>
+                      </TableCell>
+                      <TableCell>{dispute.notice_from}</TableCell>
+                      <TableCell className="font-semibold">₹{dispute.value}Cr</TableCell>
+                      <TableCell>
+                        {format(new Date(dispute.reply_due_date), "MMM dd, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={dispute.status}
+                          onValueChange={(value) => updateDisputeStatus(dispute.id, value)}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <Badge variant={getStatusVariant(dispute.status)}>
+                              {dispute.status}
+                            </Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Under Review">Under Review</SelectItem>
+                            <SelectItem value="Response Sent">Response Sent</SelectItem>
+                            <SelectItem value="Closed">Closed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {dispute.responsible_user}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Dispute</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this dispute? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteDispute(dispute.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="shadow-[var(--shadow-card)]">
-          <CardHeader>
-            <CardTitle className="text-sm">Timeline Tracking</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">15-day notices</span>
-              <span className="font-semibold text-foreground">3</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">30-day notices</span>
-              <span className="font-semibold text-warning">8</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">60-day notices</span>
-              <span className="font-semibold text-foreground">5</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">90+ day notices</span>
-              <span className="font-semibold text-destructive">2</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[var(--shadow-card)]">
-          <CardHeader>
-            <CardTitle className="text-sm">By Type</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Arbitration</span>
-              <span className="font-semibold text-foreground">8</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Court</span>
-              <span className="font-semibold text-foreground">6</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Labour</span>
-              <span className="font-semibold text-foreground">4</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">International</span>
-              <span className="font-semibold text-foreground">3</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[var(--shadow-card)]">
-          <CardHeader>
-            <CardTitle className="text-sm">Value Distribution</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">&lt; ₹50Cr</span>
-              <span className="font-semibold text-foreground">12</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">₹50-100Cr</span>
-              <span className="font-semibold text-warning">5</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">₹100-200Cr</span>
-              <span className="font-semibold text-destructive">3</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">&gt; ₹200Cr</span>
-              <span className="font-semibold text-destructive">1</span>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Total Disputes"
+          value={disputes.length.toString()}
+          icon={Clock}
+          trend={stats.byStatus["Pending"] ? {
+            value: `${stats.byStatus["Pending"]} pending action`,
+            isPositive: false
+          } : undefined}
+        />
+        <StatCard
+          title="By Type"
+          value={Object.keys(stats.byType).length.toString()}
+          icon={FileText}
+        />
+        <StatCard
+          title="Total Value"
+          value={`₹${stats.totalValue.toFixed(2)} Cr`}
+          icon={TrendingUp}
+          variant="success"
+        />
       </div>
     </div>
   );

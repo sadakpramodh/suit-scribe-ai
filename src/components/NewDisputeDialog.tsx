@@ -131,12 +131,38 @@ export default function NewDisputeDialog() {
   };
 
   const onSubmit = async (data: DisputeFormValues) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create a dispute",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
     try {
       // Upload documents if any
       const documentPaths = await uploadDocuments();
       
-      console.log({ ...data, documents: documentPaths });
+      // Insert dispute into database
+      const { error: insertError } = await supabase
+        .from("disputes")
+        .insert({
+          user_id: user.id,
+          company: data.company,
+          dispute_type: data.disputeType,
+          value: parseFloat(data.value),
+          notice_from: data.noticeFrom,
+          notice_date: data.noticeDate,
+          reply_due_date: data.replyDueDate,
+          responsible_user: data.responsibleUser,
+          description: data.description || null,
+          document_paths: documentPaths,
+          status: "Pending",
+        });
+
+      if (insertError) throw insertError;
       
       toast({
         title: "Dispute Created",
@@ -146,6 +172,9 @@ export default function NewDisputeDialog() {
       setOpen(false);
       form.reset();
       setSelectedFiles([]);
+      
+      // Trigger a page reload or custom event to refresh the disputes list
+      window.dispatchEvent(new CustomEvent("disputeCreated"));
     } catch (error: any) {
       toast({
         title: "Error",
