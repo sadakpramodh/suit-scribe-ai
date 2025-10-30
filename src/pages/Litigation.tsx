@@ -1,5 +1,8 @@
-import { useState } from "react";
-import { Plus, Search, Filter, Calendar, FileText } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2 } from "lucide-react";
+import * as XLSX from "xlsx";
+import { useLitigationCases } from "@/hooks/useLitigationCases";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,87 +26,63 @@ import {
 export default function Litigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
 
-  const litigationCases = [
-    {
-      id: "WP/2024/14113",
-      company: "Welspun Corp Ltd",
-      opponent: "Sahara Construction",
-      forum: "High Court",
-      matterType: "Civil",
-      value: 150,
-      stage: "Hearing",
-      nextHearingDate: "2025-10-25",
-      status: "active",
-      externalCounsel: "M/s Legal Associates",
-      responsibleUser: "Adv. Sharma",
-    },
-    {
-      id: "ARB/2024/5678",
-      company: "Welspun Steel",
-      opponent: "Vendor Logistics Pvt",
-      forum: "Arbitration",
-      matterType: "Arbitration",
-      value: 45,
-      stage: "Filing",
-      nextHearingDate: "2025-10-27",
-      status: "active",
-      externalCounsel: "M/s Arbitration Experts",
-      responsibleUser: "Adv. Mehta",
-    },
-    {
-      id: "LAB/2024/9012",
-      company: "Welspun Enterprises",
-      opponent: "Workers Union",
-      forum: "Labour Court",
-      matterType: "Labour",
-      value: 20,
-      stage: "Judgment",
-      nextHearingDate: "2025-11-05",
-      status: "pending",
-      externalCounsel: "M/s Labour Law Firm",
-      responsibleUser: "Adv. Patel",
-    },
-    {
-      id: "CIV/2024/3456",
-      company: "Welspun Corp Ltd",
-      opponent: "Tax Department",
-      forum: "District Court",
-      matterType: "Civil",
-      value: 80,
-      stage: "Replies",
-      nextHearingDate: "2025-11-12",
-      status: "active",
-      externalCounsel: "M/s Tax Consultants",
-      responsibleUser: "Adv. Kumar",
-    },
-    {
-      id: "INT/2024/7890",
-      company: "Welspun Global",
-      opponent: "Global Trade Inc",
-      forum: "International Court",
-      matterType: "International",
-      value: 200,
-      stage: "Hearing",
-      nextHearingDate: null,
-      status: "closed",
-      externalCounsel: "M/s International Law Partners",
-      responsibleUser: "Adv. Singh",
-    },
-  ];
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const getStatusVariant = (status: string): "active" | "pending" | "closed" => {
-    return status as "active" | "pending" | "closed";
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (jsonData.length === 0) {
+        toast.error("No data found in the Excel file");
+        return;
+      }
+
+      const casesData = jsonData.map((row: any, index: number) => ({
+        sr_no: row["Sr. No."] || index + 1,
+        parties: row["Parties"] || "",
+        forum: row["Forum"] || "",
+        particular: row["Particular"] || "",
+        start_date: row["Start Date"] ? new Date(row["Start Date"]).toISOString().split("T")[0] : null,
+        last_hearing_date: row["Last Date of Hearing"] ? new Date(row["Last Date of Hearing"]).toISOString().split("T")[0] : null,
+        next_hearing_date: row["Next Date"] ? new Date(row["Next Date"]).toISOString().split("T")[0] : null,
+        amount_involved: row["Amount involved"] || null,
+        treatment_resolution: row["Treatment undertaken Resolution"] || "",
+        remarks: row["Remarks"] || "",
+        status: "Active",
+      }));
+
+      await bulkInsertCases(casesData);
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Error processing Excel file:", error);
+      toast.error("Failed to process Excel file. Please check the format.");
+    }
   };
 
-  const filteredCases = litigationCases.filter((matter) => {
+  const handleDeleteCase = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this case?")) {
+      await deleteCase(id);
+    }
+  };
+
+  const filteredCases = cases.filter((litigationCase) => {
     const matchesSearch =
       searchQuery === "" ||
-      matter.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      matter.opponent.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      matter.id.toLowerCase().includes(searchQuery.toLowerCase());
+      litigationCase.parties.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      litigationCase.forum.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === "all" || matter.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || litigationCase.status.toLowerCase() === statusFilter.toLowerCase();
     
     return matchesSearch && matchesStatus;
   });
@@ -115,10 +94,27 @@ export default function Litigation() {
           <h1 className="text-3xl font-bold text-foreground">Litigation Cases</h1>
           <p className="mt-1 text-muted-foreground">Track all active court and arbitration proceedings</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Case
-        </Button>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" />
+            Upload Excel
+          </Button>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Case
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-[var(--shadow-card)]">
@@ -155,63 +151,114 @@ export default function Litigation() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Case Number</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Opponent</TableHead>
+                  <TableHead>Sr. No.</TableHead>
+                  <TableHead>Parties</TableHead>
                   <TableHead>Forum</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Stage</TableHead>
+                  <TableHead>Particular</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>Last Hearing</TableHead>
                   <TableHead>Next Hearing</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Treatment</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCases.map((matter) => (
-                  <TableRow key={matter.id} className="transition-colors hover:bg-muted/50">
-                    <TableCell className="font-medium">{matter.id}</TableCell>
-                    <TableCell>{matter.company}</TableCell>
-                    <TableCell>{matter.opponent}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{matter.forum}</Badge>
-                    </TableCell>
-                    <TableCell className="font-semibold">₹{matter.value}Cr</TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{matter.stage}</span>
-                    </TableCell>
-                    <TableCell>
-                      {matter.nextHearingDate ? (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm">
-                            {new Date(matter.nextHearingDate).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(matter.status)}>
-                        {matter.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-1">
-                          <FileText className="h-3 w-3" />
-                          Documents
-                        </Button>
-                      </div>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      Loading cases...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredCases.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      No litigation cases found. Upload an Excel file to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCases.map((litigationCase) => (
+                    <TableRow key={litigationCase.id} className="transition-colors hover:bg-muted/50">
+                      <TableCell className="font-medium">{litigationCase.sr_no || "-"}</TableCell>
+                      <TableCell>{litigationCase.parties}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{litigationCase.forum}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">{litigationCase.particular || "-"}</TableCell>
+                      <TableCell>
+                        {litigationCase.start_date ? (
+                          <span className="text-sm">
+                            {new Date(litigationCase.start_date).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {litigationCase.last_hearing_date ? (
+                          <span className="text-sm">
+                            {new Date(litigationCase.last_hearing_date).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {litigationCase.next_hearing_date ? (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm">
+                              {new Date(litigationCase.next_hearing_date).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {litigationCase.amount_involved ? `₹${Number(litigationCase.amount_involved).toFixed(2)}` : "-"}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {litigationCase.treatment_resolution || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={litigationCase.status.toLowerCase() === "active" ? "active" : "closed"}>
+                          {litigationCase.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteCase(litigationCase.id)}
+                            className="gap-1 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </Button>
+                          <Button variant="outline" size="sm" className="gap-1">
+                            <FileText className="h-3 w-3" />
+                            Documents
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

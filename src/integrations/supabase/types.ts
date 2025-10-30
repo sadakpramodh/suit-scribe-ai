@@ -95,6 +95,60 @@ export type Database = {
         }
         Relationships: []
       }
+      litigation_cases: {
+        Row: {
+          amount_involved: number | null
+          created_at: string
+          forum: string
+          id: string
+          last_hearing_date: string | null
+          next_hearing_date: string | null
+          particular: string | null
+          parties: string
+          remarks: string | null
+          sr_no: number | null
+          start_date: string | null
+          status: string
+          treatment_resolution: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_involved?: number | null
+          created_at?: string
+          forum: string
+          id?: string
+          last_hearing_date?: string | null
+          next_hearing_date?: string | null
+          particular?: string | null
+          parties: string
+          remarks?: string | null
+          sr_no?: number | null
+          start_date?: string | null
+          status?: string
+          treatment_resolution?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_involved?: number | null
+          created_at?: string
+          forum?: string
+          id?: string
+          last_hearing_date?: string | null
+          next_hearing_date?: string | null
+          particular?: string | null
+          parties?: string
+          remarks?: string | null
+          sr_no?: number | null
+          start_date?: string | null
+          status?: string
+          treatment_resolution?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
