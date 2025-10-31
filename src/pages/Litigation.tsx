@@ -36,30 +36,110 @@ export default function Litigation() {
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
+      
+      // Look for Sheet1 specifically
+      const sheetName = workbook.SheetNames.includes("Sheet1") ? "Sheet1" : workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      console.log("Excel data parsed:", jsonData);
+      console.log("First row sample:", jsonData[0]);
 
       if (jsonData.length === 0) {
         toast.error("No data found in the Excel file");
         return;
       }
 
-      const casesData = jsonData.map((row: any, index: number) => ({
-        sr_no: row["Sr. No."] || index + 1,
-        parties: row["Parties"] || "",
-        forum: row["Forum"] || "",
-        particular: row["Particular"] || "",
-        start_date: row["Start Date"] ? new Date(row["Start Date"]).toISOString().split("T")[0] : null,
-        last_hearing_date: row["Last Date of Hearing"] ? new Date(row["Last Date of Hearing"]).toISOString().split("T")[0] : null,
-        next_hearing_date: row["Next Date"] ? new Date(row["Next Date"]).toISOString().split("T")[0] : null,
-        amount_involved: row["Amount involved"] || null,
-        treatment_resolution: row["Treatment undertaken Resolution"] || "",
-        remarks: row["Remarks"] || "",
-        status: "Active",
-      }));
+      // Helper function to find column value with flexible matching
+      const getColumnValue = (row: any, possibleNames: string[]) => {
+        for (const name of possibleNames) {
+          const value = row[name];
+          if (value !== undefined && value !== null && value !== "") {
+            return value;
+          }
+        }
+        return null;
+      };
 
-      await bulkInsertCases(casesData);
+      const casesData = jsonData.map((row: any, index: number) => {
+        const caseData = {
+          sr_no: getColumnValue(row, ["Sr. No.", "Sr No", "SrNo", "Sr.No.", "Serial No"]) || index + 1,
+          parties: getColumnValue(row, ["Parties", "Party", "parties"]) || "",
+          forum: getColumnValue(row, ["Forum", "forum", "Court"]) || "",
+          particular: getColumnValue(row, ["Particular", "particular", "Particulars", "Details"]) || "",
+          start_date: null as string | null,
+          last_hearing_date: null as string | null,
+          next_hearing_date: null as string | null,
+          amount_involved: null as number | null,
+          treatment_resolution: getColumnValue(row, ["Treatment undertaken Resolution", "Treatment", "Resolution", "Treatment undertaken", "treatment_resolution"]) || "",
+          remarks: getColumnValue(row, ["Remarks", "remarks", "Remark", "Notes"]) || "",
+          status: "Active",
+        };
+
+        // Parse dates
+        const startDate = getColumnValue(row, ["Start Date", "StartDate", "start_date", "Date of Filing"]);
+        if (startDate) {
+          try {
+            const date = new Date(startDate);
+            if (!isNaN(date.getTime())) {
+              caseData.start_date = date.toISOString().split("T")[0];
+            }
+          } catch (e) {
+            console.warn("Invalid start date:", startDate);
+          }
+        }
+
+        const lastHearingDate = getColumnValue(row, ["Last Date of Hearing", "Last Hearing Date", "LastHearingDate", "last_hearing_date", "Last Hearing"]);
+        if (lastHearingDate) {
+          try {
+            const date = new Date(lastHearingDate);
+            if (!isNaN(date.getTime())) {
+              caseData.last_hearing_date = date.toISOString().split("T")[0];
+            }
+          } catch (e) {
+            console.warn("Invalid last hearing date:", lastHearingDate);
+          }
+        }
+
+        const nextDate = getColumnValue(row, ["Next Date", "NextDate", "next_hearing_date", "Next Hearing Date", "Next Hearing"]);
+        if (nextDate) {
+          try {
+            const date = new Date(nextDate);
+            if (!isNaN(date.getTime())) {
+              caseData.next_hearing_date = date.toISOString().split("T")[0];
+            }
+          } catch (e) {
+            console.warn("Invalid next hearing date:", nextDate);
+          }
+        }
+
+        // Parse amount
+        const amount = getColumnValue(row, ["Amount involved", "Amount Involved", "AmountInvolved", "amount_involved", "Amount"]);
+        if (amount) {
+          const parsedAmount = typeof amount === "number" ? amount : parseFloat(String(amount).replace(/[^0-9.-]/g, ""));
+          if (!isNaN(parsedAmount)) {
+            caseData.amount_involved = parsedAmount;
+          }
+        }
+
+        return caseData;
+      });
+
+      console.log("Processed cases data:", casesData);
+
+      // Validate that at least parties and forum are provided
+      const validCases = casesData.filter(c => c.parties && c.forum);
+      
+      if (validCases.length === 0) {
+        toast.error("No valid cases found. Please ensure 'Parties' and 'Forum' columns are present.");
+        return;
+      }
+
+      if (validCases.length < casesData.length) {
+        toast.warning(`${casesData.length - validCases.length} rows skipped due to missing required fields`);
+      }
+
+      await bulkInsertCases(validCases);
       
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
