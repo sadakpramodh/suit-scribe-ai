@@ -62,29 +62,45 @@ export const useLitigationCases = () => {
 
   const bulkInsertCases = async (casesData: Array<Omit<Partial<LitigationCase>, 'id' | 'user_id' | 'created_at' | 'updated_at'> & { parties: string; forum: string }>) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
+      if (authError) {
+        console.error("Auth error:", authError);
+        toast.error("Authentication error. Please log in again.");
+        return;
+      }
+
       if (!user) {
         toast.error("You must be logged in to upload cases");
         return;
       }
+
+      console.log("User authenticated:", user.id);
+      console.log("Cases to insert:", casesData);
 
       const casesWithUserId = casesData.map(caseData => ({
         ...caseData,
         user_id: user.id
       }));
 
-      const { error } = await supabase
+      console.log("Cases with user_id:", casesWithUserId);
+
+      const { data, error } = await supabase
         .from("litigation_cases")
-        .insert(casesWithUserId);
+        .insert(casesWithUserId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Insert error:", error);
+        throw error;
+      }
 
+      console.log("Insert successful:", data);
       toast.success(`Successfully imported ${casesData.length} cases`);
       fetchCases();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk inserting cases:", error);
-      toast.error("Failed to import cases");
+      toast.error(error?.message || "Failed to import cases");
     }
   };
 
