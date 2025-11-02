@@ -33,12 +33,15 @@ import {
 import NewDisputeDialog from "@/components/NewDisputeDialog";
 import StatCard from "@/components/StatCard";
 import { useDisputes } from "@/hooks/useDisputes";
+import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 export default function PreLitigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { disputes, loading, deleteDispute, updateDisputeStatus } = useDisputes();
+  const { hasPermission } = usePermissions();
 
   const getStatusVariant = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -90,7 +93,7 @@ export default function PreLitigation() {
           <h1 className="text-3xl font-bold text-foreground">Pre-Litigation Disputes</h1>
           <p className="mt-1 text-muted-foreground">Manage disputes before court filing</p>
         </div>
-        <NewDisputeDialog />
+        {hasPermission("add_dispute") && <NewDisputeDialog />}
       </div>
 
       <Card className="shadow-[var(--shadow-card)]">
@@ -184,27 +187,29 @@ export default function PreLitigation() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Dispute</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this dispute? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteDispute(dispute.id)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {hasPermission("delete_dispute") && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Dispute</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this dispute? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteDispute(dispute.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

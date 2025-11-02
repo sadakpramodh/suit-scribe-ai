@@ -22,24 +22,72 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Auto-grant admin permissions if user is the default admin
+        if (session?.user?.email === 'sadakpramodh_maduru@welspun.com') {
+          try {
+            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+            });
+          } catch (error) {
+            console.error('Error granting admin permissions:', error);
+          }
+        }
       }
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Auto-grant admin permissions if user is the default admin
+      if (session?.user?.email === 'sadakpramodh_maduru@welspun.com') {
+        try {
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+          });
+        } catch (error) {
+          console.error('Error granting admin permissions:', error);
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Check for master admin credentials
+    if (email === "admin" && password === "Welspun") {
+      // Sign in with the default admin account
+      const { error } = await supabase.auth.signInWithPassword({
+        email: "sadakpramodh_maduru@welspun.com",
+        password: "Welspun@2024", // This should be set up for the admin
+      });
+      
+      if (error) {
+        // If direct login fails, try regular credentials
+        const { error: regularError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        return { error: regularError };
+      }
+      
+      return { error };
+    }
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,

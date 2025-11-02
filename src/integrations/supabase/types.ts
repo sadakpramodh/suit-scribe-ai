@@ -173,6 +173,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          created_at: string | null
+          granted_by: string | null
+          id: string
+          permission: Database["public"]["Enums"]["app_permission"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          permission: Database["public"]["Enums"]["app_permission"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          permission?: Database["public"]["Enums"]["app_permission"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -199,6 +223,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_permission: {
+        Args: {
+          _permission: Database["public"]["Enums"]["app_permission"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -206,8 +237,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      app_permission:
+        | "add_dispute"
+        | "delete_dispute"
+        | "upload_excel_litigation"
+        | "add_users"
+        | "delete_users"
+        | "export_reports"
       app_role: "admin" | "legal_head" | "legal_counsel" | "user"
     }
     CompositeTypes: {
@@ -336,6 +375,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_permission: [
+        "add_dispute",
+        "delete_dispute",
+        "upload_excel_litigation",
+        "add_users",
+        "delete_users",
+        "export_reports",
+      ],
       app_role: ["admin", "legal_head", "legal_counsel", "user"],
     },
   },

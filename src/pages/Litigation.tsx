@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useLitigationCases } from "@/hooks/useLitigationCases";
+import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,8 +29,17 @@ export default function Litigation() {
   const [statusFilter, setStatusFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
+  const { hasPermission } = usePermissions();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasPermission("upload_excel_litigation")) {
+      toast.error("You don't have permission to upload Excel files");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+    
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -151,6 +161,11 @@ export default function Litigation() {
   };
 
   const handleDeleteCase = async (id: string) => {
+    if (!hasPermission("delete_dispute")) {
+      toast.error("You don't have permission to delete cases");
+      return;
+    }
+    
     if (window.confirm("Are you sure you want to delete this case?")) {
       await deleteCase(id);
     }
@@ -175,21 +190,25 @@ export default function Litigation() {
           <p className="mt-1 text-muted-foreground">Track all active court and arbitration proceedings</p>
         </div>
         <div className="flex gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4" />
-            Upload Excel
-          </Button>
+          {hasPermission("upload_excel_litigation") && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" />
+                Upload Excel
+              </Button>
+            </>
+          )}
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             New Case
@@ -321,15 +340,17 @@ export default function Litigation() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleDeleteCase(litigationCase.id)}
-                            className="gap-1 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Delete
-                          </Button>
+                          {hasPermission("delete_dispute") && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDeleteCase(litigationCase.id)}
+                              className="gap-1 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </Button>
+                          )}
                           <Button variant="outline" size="sm" className="gap-1">
                             <FileText className="h-3 w-3" />
                             Documents

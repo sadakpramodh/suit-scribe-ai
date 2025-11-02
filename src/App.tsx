@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import PreLitigation from "./pages/PreLitigation";
 import Litigation from "./pages/Litigation";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -60,6 +61,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Settings />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Admin />
                   </Layout>
                 </ProtectedRoute>
               }
