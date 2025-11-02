@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -20,28 +20,34 @@ export interface LitigationCase {
   updated_at: string;
 }
 
+export type LitigationCaseInsert = Omit<
+  LitigationCase,
+  "id" | "user_id" | "created_at" | "updated_at"
+>;
+
 export const useLitigationCases = () => {
   const [cases, setCases] = useState<LitigationCase[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchCases = async () => {
+  const fetchCases = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from("litigation_cases")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .returns<LitigationCase[]>();
 
       if (error) throw error;
 
-      setCases(data || []);
-    } catch (error) {
+      setCases(data ?? []);
+    } catch (error: unknown) {
       console.error("Error fetching litigation cases:", error);
       toast.error("Failed to load litigation cases");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const deleteCase = async (id: string) => {
     try {
@@ -53,17 +59,19 @@ export const useLitigationCases = () => {
       if (error) throw error;
 
       toast.success("Case deleted successfully");
-      fetchCases();
-    } catch (error) {
+      setCases((previous) => previous.filter((item) => item.id !== id));
+    } catch (error: unknown) {
       console.error("Error deleting case:", error);
       toast.error("Failed to delete case");
     }
   };
 
-  const bulkInsertCases = async (casesData: Array<Omit<Partial<LitigationCase>, 'id' | 'user_id' | 'created_at' | 'updated_at'> & { parties: string; forum: string }>) => {
+  const bulkInsertCases = async (
+    casesData: LitigationCaseInsert[]
+  ) => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
+
       if (authError) {
         console.error("Auth error:", authError);
         toast.error("Authentication error. Please log in again.");
@@ -78,9 +86,9 @@ export const useLitigationCases = () => {
       console.log("User authenticated:", user.id);
       console.log("Cases to insert:", casesData);
 
-      const casesWithUserId = casesData.map(caseData => ({
+      const casesWithUserId = casesData.map((caseData) => ({
         ...caseData,
-        user_id: user.id
+        user_id: user.id,
       }));
 
       console.log("Cases with user_id:", casesWithUserId);
@@ -88,7 +96,8 @@ export const useLitigationCases = () => {
       const { data, error } = await supabase
         .from("litigation_cases")
         .insert(casesWithUserId)
-        .select();
+        .select()
+        .returns<LitigationCase[]>();
 
       if (error) {
         console.error("Insert error:", error);
@@ -97,15 +106,17 @@ export const useLitigationCases = () => {
 
       console.log("Insert successful:", data);
       toast.success(`Successfully imported ${casesData.length} cases`);
-      fetchCases();
-    } catch (error: any) {
+      void fetchCases();
+    } catch (error: unknown) {
       console.error("Error bulk inserting cases:", error);
-      toast.error(error?.message || "Failed to import cases");
+      const message =
+        error instanceof Error ? error.message : "Failed to import cases";
+      toast.error(message);
     }
   };
 
   useEffect(() => {
-    fetchCases();
+    void fetchCases();
 
     const channel = supabase
       .channel("litigation_cases_changes")
@@ -117,15 +128,15 @@ export const useLitigationCases = () => {
           table: "litigation_cases",
         },
         () => {
-          fetchCases();
+          void fetchCases();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchCases]);
 
   return {
     cases,

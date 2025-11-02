@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
@@ -26,7 +26,7 @@ export function useDisputes() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const fetchDisputes = async () => {
+  const fetchDisputes = useCallback(async () => {
     if (!user) {
       setDisputes([]);
       setLoading(false);
@@ -38,20 +38,23 @@ export function useDisputes() {
       const { data, error } = await supabase
         .from("disputes")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .returns<Dispute[]>();
 
       if (error) throw error;
-      setDisputes(data || []);
-    } catch (error: any) {
+      setDisputes(data ?? []);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch disputes";
       toast({
         title: "Error",
-        description: error.message || "Failed to fetch disputes",
+        description: message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast, user]);
 
   const deleteDispute = async (id: string) => {
     try {
@@ -59,15 +62,17 @@ export function useDisputes() {
 
       if (error) throw error;
 
-      setDisputes(disputes.filter((d) => d.id !== id));
+      setDisputes((previous) => previous.filter((dispute) => dispute.id !== id));
       toast({
         title: "Dispute Deleted",
         description: "The dispute has been deleted successfully.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete dispute";
       toast({
         title: "Error",
-        description: error.message || "Failed to delete dispute",
+        description: message,
         variant: "destructive",
       });
     }
@@ -82,30 +87,43 @@ export function useDisputes() {
 
       if (error) throw error;
 
-      setDisputes(
-        disputes.map((d) => (d.id === id ? { ...d, status } : d))
+      setDisputes((previous) =>
+        previous.map((dispute) =>
+          dispute.id === id ? { ...dispute, status } : dispute
+        )
       );
       toast({
         title: "Status Updated",
         description: "The dispute status has been updated successfully.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update status";
       toast({
         title: "Error",
-        description: error.message || "Failed to update status",
+        description: message,
         variant: "destructive",
       });
     }
   };
 
   useEffect(() => {
-    fetchDisputes();
+    if (!user?.id) {
+      setDisputes([]);
+      setLoading(false);
+      return;
+    }
+
+    void fetchDisputes();
 
     // Listen for dispute creation events
     const handleDisputeCreated = () => {
-      fetchDisputes();
+      void fetchDisputes();
     };
-    window.addEventListener("disputeCreated", handleDisputeCreated);
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("disputeCreated", handleDisputeCreated);
+    }
 
     // Set up realtime subscription
     const channel = supabase
@@ -116,19 +134,21 @@ export function useDisputes() {
           event: "*",
           schema: "public",
           table: "disputes",
-          filter: `user_id=eq.${user?.id}`,
+          filter: `user_id=eq.${user.id}`,
         },
         () => {
-          fetchDisputes();
+          void fetchDisputes();
         }
       )
       .subscribe();
 
     return () => {
-      window.removeEventListener("disputeCreated", handleDisputeCreated);
-      supabase.removeChannel(channel);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("disputeCreated", handleDisputeCreated);
+      }
+      void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [fetchDisputes, user?.id]);
 
   return {
     disputes,

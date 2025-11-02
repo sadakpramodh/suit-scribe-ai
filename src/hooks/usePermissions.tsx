@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type Permission = 
+export type Permission =
   | "add_dispute"
   | "delete_dispute"
   | "upload_excel_litigation"
@@ -11,21 +11,39 @@ export type Permission =
   | "export_reports";
 
 export const usePermissions = () => {
-  const queryClient = useQueryClient();
-
   const { data: permissions = [], isLoading } = useQuery({
     queryKey: ["user-permissions"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        throw authError;
+      }
       if (!user) return [];
+
+      type PermissionRow = { permission: string };
 
       const { data, error } = await supabase
         .from("user_permissions")
         .select("permission")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .returns<PermissionRow[]>();
 
       if (error) throw error;
-      return data.map(p => p.permission as Permission);
+      const isPermission = (value: string): value is Permission =>
+        [
+          "add_dispute",
+          "delete_dispute",
+          "upload_excel_litigation",
+          "add_users",
+          "delete_users",
+          "export_reports",
+        ].includes(value as Permission);
+
+      const records = data ?? [];
+
+      return records
+        .map((record) => record.permission)
+        .filter((permission): permission is Permission => isPermission(permission));
     },
   });
 
@@ -58,14 +76,23 @@ export const useAdminUsers = () => {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
       if (!session) {
         throw new Error("No active session");
       }
 
+      type AdminUsersResponse = {
+        users: User[];
+        error?: string;
+      };
+
       // Call edge function to fetch users securely
-      const { data, error } = await supabase.functions.invoke("get-admin-users", {
+      const { data, error } = await supabase.functions.invoke<AdminUsersResponse>("get-admin-users", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -80,14 +107,18 @@ export const useAdminUsers = () => {
         throw new Error(data.error);
       }
 
-      return data.users as User[];
+      return data?.users ?? [];
     },
   });
 
   const grantPermission = useMutation({
     mutationFn: async ({ userId, permission }: { userId: string; permission: Permission }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError) {
+        throw authError;
+      }
+
       const { error } = await supabase
         .from("user_permissions")
         .insert({
@@ -102,9 +133,11 @@ export const useAdminUsers = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success("Permission granted successfully");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error granting permission:", error);
-      toast.error(error.message || "Failed to grant permission");
+      const message =
+        error instanceof Error ? error.message : "Failed to grant permission";
+      toast.error(message);
     },
   });
 
@@ -122,9 +155,11 @@ export const useAdminUsers = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success("Permission revoked successfully");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error revoking permission:", error);
-      toast.error(error.message || "Failed to revoke permission");
+      const message =
+        error instanceof Error ? error.message : "Failed to revoke permission";
+      toast.error(message);
     },
   });
 

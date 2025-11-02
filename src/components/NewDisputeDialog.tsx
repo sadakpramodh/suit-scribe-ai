@@ -175,10 +175,12 @@ export default function NewDisputeDialog() {
       
       // Trigger a page reload or custom event to refresh the disputes list
       window.dispatchEvent(new CustomEvent("disputeCreated"));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to create dispute";
       toast({
         title: "Error",
-        description: error.message || "Failed to create dispute",
+        description: message,
         variant: "destructive",
       });
     } finally {

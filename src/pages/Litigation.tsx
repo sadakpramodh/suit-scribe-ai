@@ -1,7 +1,10 @@
 import { useState, useRef } from "react";
 import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
-import { useLitigationCases } from "@/hooks/useLitigationCases";
+import {
+  useLitigationCases,
+  type LitigationCaseInsert,
+} from "@/hooks/useLitigationCases";
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,13 +35,74 @@ export default function Litigation() {
   const { hasPermission } = usePermissions();
 
   // Sanitize Excel row to prevent formula injection
-  const sanitizeValue = (value: any): any => {
-    if (typeof value === 'string') {
+  const sanitizeValue = (value: unknown): unknown => {
+    if (typeof value === "string") {
       // Strip leading formula characters (=, +, -, @)
-      const sanitized = value.replace(/^[=+\-@]/, '').trim();
-      return sanitized;
+      return value.replace(/^[=+\-@]/, "").trim();
     }
     return value;
+  };
+
+  const getColumnValue = (
+    row: Record<string, unknown>,
+    possibleNames: string[]
+  ): unknown => {
+    for (const name of possibleNames) {
+      const entry = Object.entries(row).find(
+        ([key]) => key.trim().toLowerCase() === name.trim().toLowerCase()
+      );
+
+      if (!entry) {
+        continue;
+      }
+
+      const [, value] = entry;
+      if (value !== undefined && value !== null && value !== "") {
+        return value;
+      }
+    }
+
+    return null;
+  };
+
+  const getStringValue = (value: unknown): string => {
+    if (typeof value === "string") {
+      return value;
+    }
+    if (value === null || value === undefined) {
+      return "";
+    }
+    return String(value);
+  };
+
+  const parseDateValue = (value: unknown): string | null => {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    const dateValue =
+      value instanceof Date
+        ? value
+        : typeof value === "string" || typeof value === "number"
+          ? new Date(value)
+          : null;
+
+    if (!dateValue || Number.isNaN(dateValue.getTime())) {
+      return null;
+    }
+
+    return dateValue.toISOString().split("T")[0];
+  };
+
+  const parseNumberValue = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = parseFloat(value.replace(/[^0-9.-]/g, ""));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +134,9 @@ export default function Litigation() {
       // Look for Sheet1 specifically
       const sheetName = workbook.SheetNames.includes("Sheet1") ? "Sheet1" : workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+        defval: "",
+      });
 
       console.log("Excel data parsed:", jsonData);
       console.log("First row sample:", jsonData[0]);
@@ -90,84 +156,80 @@ export default function Litigation() {
         return;
       }
 
-      // Helper function to find column value with flexible matching
-      const getColumnValue = (row: any, possibleNames: string[]) => {
-        for (const name of possibleNames) {
-          const value = row[name];
-          if (value !== undefined && value !== null && value !== "") {
-            return value;
-          }
+      const casesData: LitigationCaseInsert[] = jsonData.map((row, index) => {
+        const sanitizedRow: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(row)) {
+          sanitizedRow[key] = sanitizeValue(value);
         }
-        return null;
-      };
 
-      const casesData = jsonData.map((row: any, index: number) => {
-        // Sanitize all string values to prevent formula injection
-        const sanitizedRow: any = {};
-        Object.keys(row).forEach(key => {
-          sanitizedRow[key] = sanitizeValue(row[key]);
-        });
+        const srNoRaw =
+          getColumnValue(sanitizedRow, ["Sr. No.", "Sr No", "SrNo", "Sr.No.", "Serial No"]) ?? index + 1;
+        const srNo = parseNumberValue(srNoRaw) ?? index + 1;
 
-        const caseData = {
-          sr_no: getColumnValue(sanitizedRow, ["Sr. No.", "Sr No", "SrNo", "Sr.No.", "Serial No"]) || index + 1,
-          parties: String(getColumnValue(sanitizedRow, ["Parties", "Party", "parties"]) || "").substring(0, 500),
-          forum: String(getColumnValue(sanitizedRow, ["Forum", "forum", "Court"]) || "").substring(0, 200),
-          particular: String(getColumnValue(sanitizedRow, ["Particular", "particular", "Particulars", "Details"]) || "").substring(0, 1000),
-          start_date: null as string | null,
-          last_hearing_date: null as string | null,
-          next_hearing_date: null as string | null,
-          amount_involved: null as number | null,
-          treatment_resolution: String(getColumnValue(sanitizedRow, ["Treatment undertaken Resolution", "Treatment", "Resolution", "Treatment undertaken", "treatment_resolution"]) || "").substring(0, 2000),
-          remarks: String(getColumnValue(sanitizedRow, ["Remarks", "remarks", "Remark", "Notes"]) || "").substring(0, 2000),
+        const caseData: LitigationCaseInsert = {
+          sr_no: srNo,
+          parties: getStringValue(
+            getColumnValue(sanitizedRow, ["Parties", "Party", "parties"])
+          )
+            .substring(0, 500)
+            .trim(),
+          forum: getStringValue(
+            getColumnValue(sanitizedRow, ["Forum", "forum", "Court"])
+          )
+            .substring(0, 200)
+            .trim(),
+          particular: getStringValue(
+            getColumnValue(sanitizedRow, ["Particular", "particular", "Particulars", "Details"])
+          )
+            .substring(0, 1000)
+            .trim() || null,
+          start_date: null,
+          last_hearing_date: null,
+          next_hearing_date: null,
+          amount_involved: null,
+          treatment_resolution: getStringValue(
+            getColumnValue(sanitizedRow, ["Treatment undertaken Resolution", "Treatment", "Resolution", "Treatment undertaken", "treatment_resolution"])
+          )
+            .substring(0, 2000)
+            .trim() || null,
+          remarks: getStringValue(
+            getColumnValue(sanitizedRow, ["Remarks", "remarks", "Remark", "Notes"])
+          )
+            .substring(0, 2000)
+            .trim() || null,
           status: "Active",
         };
 
-        // Parse dates
-        const startDate = getColumnValue(row, ["Start Date", "StartDate", "start_date", "Date of Filing"]);
+        const startDate = parseDateValue(
+          getColumnValue(sanitizedRow, ["Start Date", "StartDate", "start_date", "Date of Filing"])
+        );
         if (startDate) {
-          try {
-            const date = new Date(startDate);
-            if (!isNaN(date.getTime())) {
-              caseData.start_date = date.toISOString().split("T")[0];
-            }
-          } catch (e) {
-            console.warn("Invalid start date:", startDate);
-          }
+          caseData.start_date = startDate;
         }
 
-        const lastHearingDate = getColumnValue(row, ["Last Date of Hearing", "Last Hearing Date", "LastHearingDate", "last_hearing_date", "Last Hearing"]);
+        const lastHearingDate = parseDateValue(
+          getColumnValue(sanitizedRow, ["Last Date of Hearing", "Last Hearing Date", "LastHearingDate", "last_hearing_date", "Last Hearing"])
+        );
         if (lastHearingDate) {
-          try {
-            const date = new Date(lastHearingDate);
-            if (!isNaN(date.getTime())) {
-              caseData.last_hearing_date = date.toISOString().split("T")[0];
-            }
-          } catch (e) {
-            console.warn("Invalid last hearing date:", lastHearingDate);
-          }
+          caseData.last_hearing_date = lastHearingDate;
         }
 
-        const nextDate = getColumnValue(row, ["Next Date", "NextDate", "next_hearing_date", "Next Hearing Date", "Next Hearing"]);
+        const nextDate = parseDateValue(
+          getColumnValue(sanitizedRow, ["Next Date", "NextDate", "next_hearing_date", "Next Hearing Date", "Next Hearing"])
+        );
         if (nextDate) {
-          try {
-            const date = new Date(nextDate);
-            if (!isNaN(date.getTime())) {
-              caseData.next_hearing_date = date.toISOString().split("T")[0];
-            }
-          } catch (e) {
-            console.warn("Invalid next hearing date:", nextDate);
-          }
+          caseData.next_hearing_date = nextDate;
         }
 
-        // Parse amount with validation
-        const amount = getColumnValue(sanitizedRow, ["Amount involved", "Amount Involved", "AmountInvolved", "amount_involved", "Amount"]);
-        if (amount) {
-          const parsedAmount = typeof amount === "number" ? amount : parseFloat(String(amount).replace(/[^0-9.-]/g, ""));
-          const MAX_AMOUNT = 999999999999; // 12 digits max
-          if (!isNaN(parsedAmount) && parsedAmount >= 0 && parsedAmount <= MAX_AMOUNT) {
-            caseData.amount_involved = parsedAmount;
-          } else if (!isNaN(parsedAmount)) {
-            console.warn(`Amount out of range for row ${index + 1}:`, parsedAmount);
+        const amount = parseNumberValue(
+          getColumnValue(sanitizedRow, ["Amount involved", "Amount Involved", "AmountInvolved", "amount_involved", "Amount"])
+        );
+        if (amount !== null) {
+          const MAX_AMOUNT = 999_999_999_999; // 12 digits max
+          if (amount >= 0 && amount <= MAX_AMOUNT) {
+            caseData.amount_involved = amount;
+          } else {
+            console.warn(`Amount out of range for row ${index + 1}:`, amount);
           }
         }
 
@@ -177,7 +239,9 @@ export default function Litigation() {
       console.log("Processed cases data:", casesData);
 
       // Validate that at least parties and forum are provided
-      const validCases = casesData.filter(c => c.parties && c.forum);
+      const validCases = casesData.filter(
+        (caseItem) => caseItem.parties !== "" && caseItem.forum !== ""
+      );
       
       if (validCases.length === 0) {
         toast.error("No valid cases found. Please ensure 'Parties' and 'Forum' columns are present.");
@@ -193,7 +257,7 @@ export default function Litigation() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error processing Excel file:", error);
       toast.error("Failed to process Excel file. Please check the format.");
     }
