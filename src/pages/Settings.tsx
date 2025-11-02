@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,51 +26,102 @@ const Settings = () => {
     whatsapp_number: "",
   });
 
+  type ProfileRow = {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+
+  type AlertSettingsRow = {
+    email_alerts: boolean;
+    whatsapp_alerts: boolean;
+    whatsapp_number: string | null;
+  };
+
+  const loadProfile = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle<ProfileRow>();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        setProfile({
+          full_name: data.full_name ?? "",
+          avatar_url: data.avatar_url ?? "",
+        });
+      }
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load profile";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }, [toast, user?.id]);
+
+  const loadAlertSettings = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("alert_settings")
+        .select("email_alerts, whatsapp_alerts, whatsapp_number")
+        .eq("user_id", user.id)
+        .maybeSingle<AlertSettingsRow>();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        setAlertSettings({
+          email_alerts: data.email_alerts,
+          whatsapp_alerts: data.whatsapp_alerts,
+          whatsapp_number: data.whatsapp_number ?? "",
+        });
+      }
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load alert settings";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }, [toast, user?.id]);
+
   useEffect(() => {
-    if (user) {
-      loadProfile();
-      loadAlertSettings();
+    if (!user?.id) {
+      return;
     }
-  }, [user]);
 
-  const loadProfile = async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user?.id)
-      .single();
-
-    if (data) {
-      setProfile({
-        full_name: data.full_name || "",
-        avatar_url: data.avatar_url || "",
-      });
-    }
-  };
-
-  const loadAlertSettings = async () => {
-    const { data, error } = await supabase
-      .from("alert_settings")
-      .select("*")
-      .eq("user_id", user?.id)
-      .single();
-
-    if (data) {
-      setAlertSettings({
-        email_alerts: data.email_alerts,
-        whatsapp_alerts: data.whatsapp_alerts,
-        whatsapp_number: data.whatsapp_number || "",
-      });
-    }
-  };
+    void loadProfile();
+    void loadAlertSettings();
+  }, [loadAlertSettings, loadProfile, user?.id]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user?.id) return;
 
     setUploading(true);
     try {
-      const fileExt = file.name.split(".").pop();
+      const fileExt = file.name.split(".").pop() ?? "png";
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
@@ -79,20 +130,28 @@ const Settings = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: publicUrlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName);
 
-      setProfile({ ...profile, avatar_url: publicUrl });
+      const publicUrl = publicUrlData.publicUrl;
+
+      if (!publicUrl) {
+        throw new Error("Failed to retrieve avatar URL");
+      }
+
+      setProfile((previous) => ({ ...previous, avatar_url: publicUrl }));
 
       toast({
         title: "Success",
         description: "Avatar uploaded successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to upload avatar";
       toast({
         title: "Error",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -101,6 +160,15 @@ const Settings = () => {
   };
 
   const handleSaveProfile = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be signed in to update your profile.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -109,7 +177,7 @@ const Settings = () => {
           full_name: profile.full_name,
           avatar_url: profile.avatar_url,
         })
-        .eq("id", user?.id);
+        .eq("id", user.id);
 
       if (error) throw error;
 
@@ -117,10 +185,12 @@ const Settings = () => {
         title: "Success",
         description: "Profile updated successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update profile";
       toast({
         title: "Error",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -129,6 +199,15 @@ const Settings = () => {
   };
 
   const handleSaveAlertSettings = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be signed in to update alert settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -138,7 +217,7 @@ const Settings = () => {
           whatsapp_alerts: alertSettings.whatsapp_alerts,
           whatsapp_number: alertSettings.whatsapp_number,
         })
-        .eq("user_id", user?.id);
+        .eq("user_id", user.id);
 
       if (error) throw error;
 
@@ -146,10 +225,14 @@ const Settings = () => {
         title: "Success",
         description: "Alert settings updated successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update alert settings";
       toast({
         title: "Error",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {

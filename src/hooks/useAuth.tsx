@@ -1,20 +1,23 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { type AuthError, type Session, type User } from "@supabase/supabase-js";
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 'Authorization': `Bearer ${session.access_token}`,
               },
             });
-          } catch (error) {
+          } catch (error: unknown) {
             console.error('Error granting admin permissions:', error);
           }
         }
@@ -58,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               'Authorization': `Bearer ${session.access_token}`,
             },
           });
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Error granting admin permissions:', error);
         }
       }
