@@ -58,39 +58,29 @@ export const useAdminUsers = () => {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Get all profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, full_name");
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("No active session");
+      }
 
-      if (profilesError) throw profilesError;
+      // Call edge function to fetch users securely
+      const { data, error } = await supabase.functions.invoke("get-admin-users", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      // Get all users' permissions
-      const { data: perms, error: permsError } = await supabase
-        .from("user_permissions")
-        .select("user_id, permission");
+      if (error) {
+        console.error("Error fetching admin users:", error);
+        throw error;
+      }
 
-      if (permsError) throw permsError;
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
-      // Get user emails from auth (this requires proper RLS setup)
-      const usersWithData: User[] = await Promise.all(
-        profiles.map(async (profile) => {
-          const { data: { user } } = await supabase.auth.admin.getUserById(profile.id);
-          
-          const userPerms = perms
-            .filter(p => p.user_id === profile.id)
-            .map(p => p.permission as Permission);
-
-          return {
-            id: profile.id,
-            email: user?.email || "unknown",
-            full_name: profile.full_name || undefined,
-            permissions: userPerms,
-          };
-        })
-      );
-
-      return usersWithData;
+      return data.users as User[];
     },
   });
 

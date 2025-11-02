@@ -31,6 +31,16 @@ export default function Litigation() {
   const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
   const { hasPermission } = usePermissions();
 
+  // Sanitize Excel row to prevent formula injection
+  const sanitizeValue = (value: any): any => {
+    if (typeof value === 'string') {
+      // Strip leading formula characters (=, +, -, @)
+      const sanitized = value.replace(/^[=+\-@]/, '').trim();
+      return sanitized;
+    }
+    return value;
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!hasPermission("upload_excel_litigation")) {
       toast.error("You don't have permission to upload Excel files");
@@ -42,6 +52,16 @@ export default function Litigation() {
     
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Validate file size (5MB limit)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File too large. Maximum size allowed is 5MB.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
 
     try {
       const data = await file.arrayBuffer();
@@ -60,6 +80,16 @@ export default function Litigation() {
         return;
       }
 
+      // Validate row count (1000 row limit)
+      const MAX_ROWS = 1000;
+      if (jsonData.length > MAX_ROWS) {
+        toast.error(`Too many rows. Maximum ${MAX_ROWS} rows allowed. Found ${jsonData.length} rows.`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
       // Helper function to find column value with flexible matching
       const getColumnValue = (row: any, possibleNames: string[]) => {
         for (const name of possibleNames) {
@@ -72,17 +102,23 @@ export default function Litigation() {
       };
 
       const casesData = jsonData.map((row: any, index: number) => {
+        // Sanitize all string values to prevent formula injection
+        const sanitizedRow: any = {};
+        Object.keys(row).forEach(key => {
+          sanitizedRow[key] = sanitizeValue(row[key]);
+        });
+
         const caseData = {
-          sr_no: getColumnValue(row, ["Sr. No.", "Sr No", "SrNo", "Sr.No.", "Serial No"]) || index + 1,
-          parties: getColumnValue(row, ["Parties", "Party", "parties"]) || "",
-          forum: getColumnValue(row, ["Forum", "forum", "Court"]) || "",
-          particular: getColumnValue(row, ["Particular", "particular", "Particulars", "Details"]) || "",
+          sr_no: getColumnValue(sanitizedRow, ["Sr. No.", "Sr No", "SrNo", "Sr.No.", "Serial No"]) || index + 1,
+          parties: String(getColumnValue(sanitizedRow, ["Parties", "Party", "parties"]) || "").substring(0, 500),
+          forum: String(getColumnValue(sanitizedRow, ["Forum", "forum", "Court"]) || "").substring(0, 200),
+          particular: String(getColumnValue(sanitizedRow, ["Particular", "particular", "Particulars", "Details"]) || "").substring(0, 1000),
           start_date: null as string | null,
           last_hearing_date: null as string | null,
           next_hearing_date: null as string | null,
           amount_involved: null as number | null,
-          treatment_resolution: getColumnValue(row, ["Treatment undertaken Resolution", "Treatment", "Resolution", "Treatment undertaken", "treatment_resolution"]) || "",
-          remarks: getColumnValue(row, ["Remarks", "remarks", "Remark", "Notes"]) || "",
+          treatment_resolution: String(getColumnValue(sanitizedRow, ["Treatment undertaken Resolution", "Treatment", "Resolution", "Treatment undertaken", "treatment_resolution"]) || "").substring(0, 2000),
+          remarks: String(getColumnValue(sanitizedRow, ["Remarks", "remarks", "Remark", "Notes"]) || "").substring(0, 2000),
           status: "Active",
         };
 
@@ -123,12 +159,15 @@ export default function Litigation() {
           }
         }
 
-        // Parse amount
-        const amount = getColumnValue(row, ["Amount involved", "Amount Involved", "AmountInvolved", "amount_involved", "Amount"]);
+        // Parse amount with validation
+        const amount = getColumnValue(sanitizedRow, ["Amount involved", "Amount Involved", "AmountInvolved", "amount_involved", "Amount"]);
         if (amount) {
           const parsedAmount = typeof amount === "number" ? amount : parseFloat(String(amount).replace(/[^0-9.-]/g, ""));
-          if (!isNaN(parsedAmount)) {
+          const MAX_AMOUNT = 999999999999; // 12 digits max
+          if (!isNaN(parsedAmount) && parsedAmount >= 0 && parsedAmount <= MAX_AMOUNT) {
             caseData.amount_involved = parsedAmount;
+          } else if (!isNaN(parsedAmount)) {
+            console.warn(`Amount out of range for row ${index + 1}:`, parsedAmount);
           }
         }
 

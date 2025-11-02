@@ -68,26 +68,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Check for master admin credentials
-    if (email === "admin" && password === "Welspun") {
-      // Sign in with the default admin account
-      const { error } = await supabase.auth.signInWithPassword({
-        email: "sadakpramodh_maduru@welspun.com",
-        password: "Welspun@2024", // This should be set up for the admin
-      });
-      
-      if (error) {
-        // If direct login fails, try regular credentials
-        const { error: regularError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        return { error: regularError };
-      }
-      
-      return { error };
-    }
-    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
