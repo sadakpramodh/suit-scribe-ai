@@ -1,4 +1,4 @@
-import { Shield, UserPlus, UserMinus, CheckCircle, XCircle } from "lucide-react";
+import { Shield, UserPlus, UserMinus, CheckCircle, XCircle, UserCheck } from "lucide-react";
 import { usePermissions, useAdminUsers, Permission } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 
 const PERMISSION_LABELS: Record<Permission, string> = {
   add_dispute: "Add Dispute",
@@ -24,7 +25,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
 
 export default function Admin() {
   const { isAdmin, isLoading: permissionsLoading } = usePermissions();
-  const { users, isLoading: usersLoading, grantPermission, revokePermission } = useAdminUsers();
+  const { users, isLoading: usersLoading, grantPermission, revokePermission, toggleUserApproval } = useAdminUsers();
 
   if (permissionsLoading) {
     return (
@@ -85,6 +86,7 @@ export default function Admin() {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead className="text-center">Approved</TableHead>
                   {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
                     <TableHead key={key} className="text-center">
                       {label}
@@ -95,13 +97,13 @@ export default function Admin() {
               <TableBody>
                 {usersLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Loading users...
                     </TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -112,6 +114,22 @@ export default function Admin() {
                         {user.full_name || "Unknown"}
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-center items-center gap-2">
+                          <Switch
+                            checked={user.approved ?? false}
+                            onCheckedChange={() => toggleUserApproval.mutate({ 
+                              userId: user.id, 
+                              approved: !(user.approved ?? false) 
+                            })}
+                          />
+                          {user.approved ? (
+                            <Badge variant="default" className="text-xs">Active</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-xs">Pending</Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       {Object.keys(PERMISSION_LABELS).map((permission) => {
                         const hasPermission = user.permissions.includes(permission as Permission);
                         return (

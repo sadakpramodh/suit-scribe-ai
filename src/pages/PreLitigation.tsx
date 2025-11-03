@@ -169,8 +169,8 @@ export default function PreLitigation() {
                           value={dispute.status}
                           onValueChange={(value) => updateDisputeStatus(dispute.id, value)}
                         >
-                          <SelectTrigger className="w-[140px]">
-                            <Badge variant={getStatusVariant(dispute.status)}>
+                          <SelectTrigger className="w-[160px] border-0 bg-transparent hover:bg-muted/50 focus:ring-0 focus:ring-offset-0">
+                            <Badge variant={getStatusVariant(dispute.status)} className="w-full justify-center">
                               {dispute.status}
                             </Badge>
                           </SelectTrigger>

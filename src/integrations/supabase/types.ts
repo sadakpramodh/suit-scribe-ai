@@ -151,6 +151,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approved: boolean
           avatar_url: string | null
           created_at: string | null
           full_name: string | null
@@ -158,6 +159,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          approved?: boolean
           avatar_url?: string | null
           created_at?: string | null
           full_name?: string | null
@@ -165,6 +167,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          approved?: boolean
           avatar_url?: string | null
           created_at?: string | null
           full_name?: string | null
@@ -238,6 +241,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_user_approved: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_permission:

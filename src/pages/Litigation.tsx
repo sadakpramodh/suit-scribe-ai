@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import Papa from "papaparse";
 import {
   useLitigationCases,
   type LitigationCaseInsert,
@@ -34,13 +35,46 @@ export default function Litigation() {
   const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
   const { hasPermission } = usePermissions();
 
-  // Sanitize Excel row to prevent formula injection
+  // Sanitize Excel/CSV row to prevent formula injection
   const sanitizeValue = (value: unknown): unknown => {
     if (typeof value === "string") {
       // Strip leading formula characters (=, +, -, @)
       return value.replace(/^[=+\-@]/, "").trim();
     }
     return value;
+  };
+
+  // Parse date in dd-mm-yyyy format
+  const parseDateDDMMYYYY = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    
+    // Try to parse dd-mm-yyyy format
+    const parts = String(dateStr).split(/[-/]/);
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+      const year = parseInt(parts[2], 10);
+      
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return new Date(year, month, day);
+      }
+    }
+    
+    // Fallback to standard date parsing
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
+  // Extract numbers from text (e.g., "Rs. 10,000" -> 10000)
+  const extractNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    
+    const str = String(value);
+    // Extract all digits and decimal point
+    const numbers = str.replace(/[^\d.]/g, '');
+    const parsed = parseFloat(numbers);
+    
+    return isNaN(parsed) ? null : parsed;
   };
 
   const getColumnValue = (
@@ -80,6 +114,15 @@ export default function Litigation() {
       return null;
     }
 
+    // First try dd-mm-yyyy format
+    if (typeof value === "string") {
+      const ddmmyyyyDate = parseDateDDMMYYYY(value);
+      if (ddmmyyyyDate) {
+        return ddmmyyyyDate.toISOString().split("T")[0];
+      }
+    }
+
+    // Fallback to standard parsing
     const dateValue =
       value instanceof Date
         ? value
@@ -99,15 +142,16 @@ export default function Litigation() {
       return value;
     }
     if (typeof value === "string") {
-      const parsed = parseFloat(value.replace(/[^0-9.-]/g, ""));
-      return Number.isFinite(parsed) ? parsed : null;
+      // Use extractNumber for better text extraction
+      const extracted = extractNumber(value);
+      return extracted;
     }
     return null;
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!hasPermission("upload_excel_litigation")) {
-      toast.error("You don't have permission to upload Excel files");
+      toast.error("You don't have permission to upload files");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -116,6 +160,18 @@ export default function Litigation() {
     
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Check file type
+    const isCSV = file.name.toLowerCase().endsWith('.csv');
+    const isExcel = file.name.toLowerCase().match(/\.(xlsx|xls)$/);
+
+    if (!isCSV && !isExcel) {
+      toast.error("Please upload a CSV or Excel file (.csv, .xlsx, .xls)");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
 
     // Validate file size (5MB limit)
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -128,15 +184,29 @@ export default function Litigation() {
     }
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      
-      // Look for Sheet1 specifically
-      const sheetName = workbook.SheetNames.includes("Sheet1") ? "Sheet1" : workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-        defval: "",
-      });
+      let jsonData: Record<string, unknown>[] = [];
+
+      if (isCSV) {
+        // Parse CSV file
+        const text = await file.text();
+        const result = Papa.parse<Record<string, unknown>>(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (header: string) => header.trim(),
+        });
+        jsonData = result.data;
+      } else {
+        // Parse Excel file
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+        
+        // Look for Sheet1 specifically
+        const sheetName = workbook.SheetNames.includes("Sheet1") ? "Sheet1" : workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+          defval: "",
+        });
+      }
 
       console.log("Excel data parsed:", jsonData);
       console.log("First row sample:", jsonData[0]);
@@ -298,7 +368,7 @@ export default function Litigation() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -308,7 +378,7 @@ export default function Litigation() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4" />
-                Upload Excel
+                Upload CSV/Excel
               </Button>
             </>
           )}

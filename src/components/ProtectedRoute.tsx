@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,6 +14,23 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
+    }
+    
+    // Check if user is approved
+    if (!loading && user) {
+      const checkApproval = async () => {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("approved")
+          .eq("id", user.id)
+          .single();
+          
+        if (!error && data && !data.approved) {
+          navigate('/pending-approval');
+        }
+      };
+      
+      void checkApproval();
     }
   }, [user, loading, navigate]);
 

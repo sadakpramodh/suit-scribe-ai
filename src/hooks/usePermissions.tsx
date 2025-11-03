@@ -68,6 +68,7 @@ interface User {
   email: string;
   full_name?: string;
   permissions: Permission[];
+  approved?: boolean;
 }
 
 export const useAdminUsers = () => {
@@ -163,10 +164,32 @@ export const useAdminUsers = () => {
     },
   });
 
+  const toggleUserApproval = useMutation({
+    mutationFn: async ({ userId, approved }: { userId: string; approved: boolean }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ approved })
+        .eq("id", userId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success(variables.approved ? "User approved successfully" : "User access disabled");
+    },
+    onError: (error: unknown) => {
+      console.error("Error updating user approval:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to update user approval";
+      toast.error(message);
+    },
+  });
+
   return {
     users,
     isLoading,
     grantPermission,
     revokePermission,
+    toggleUserApproval,
   };
 };
