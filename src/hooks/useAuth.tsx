@@ -25,45 +25,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
         
         // Auto-grant admin permissions if user is the default admin
         if (session?.user?.email === 'sadakpramodh_maduru@welspun.com') {
-          try {
-            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
+          setTimeout(() => {
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${session.access_token}`,
               },
+            }).catch((error: unknown) => {
+              console.error('Error granting admin permissions:', error);
             });
-          } catch (error: unknown) {
-            console.error('Error granting admin permissions:', error);
-          }
+          }, 0);
         }
       }
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
       // Auto-grant admin permissions if user is the default admin
       if (session?.user?.email === 'sadakpramodh_maduru@welspun.com') {
-        try {
-          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
+        setTimeout(() => {
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
             },
+          }).catch((error: unknown) => {
+            console.error('Error granting admin permissions:', error);
           });
-        } catch (error: unknown) {
-          console.error('Error granting admin permissions:', error);
-        }
+        }, 0);
       }
     });
 

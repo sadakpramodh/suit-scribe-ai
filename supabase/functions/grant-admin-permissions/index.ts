@@ -32,6 +32,12 @@ Deno.serve(async (req) => {
 
     // Check if user is the admin
     if (user.email === ADMIN_EMAIL) {
+      // Approve admin user automatically
+      await supabaseClient
+        .from('profiles')
+        .update({ approved: true })
+        .eq('id', user.id);
+
       // Check existing permissions
       const { data: existingPerms } = await supabaseClient
         .from('user_permissions')
@@ -57,7 +63,7 @@ Deno.serve(async (req) => {
 
         return new Response(
           JSON.stringify({
-            message: 'Admin permissions granted',
+            message: 'Admin permissions granted and approved',
             granted: missingPermissions,
           }),
           {
@@ -68,7 +74,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ message: 'Admin already has all permissions' }),
+        JSON.stringify({ message: 'Admin already has all permissions and is approved' }),
         {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
