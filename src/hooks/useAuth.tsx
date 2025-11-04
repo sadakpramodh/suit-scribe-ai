@@ -29,20 +29,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-        
-        // Auto-grant admin permissions if user is the default admin
-        if (session?.user?.email === 'sadakpramodh_maduru@welspun.com') {
-          setTimeout(() => {
-            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-              },
-            }).catch((error: unknown) => {
-              console.error('Error granting admin permissions:', error);
-            });
-          }, 0);
-        }
       }
     );
 
@@ -51,20 +37,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      
-      // Auto-grant admin permissions if user is the default admin
-      if (session?.user?.email === 'sadakpramodh_maduru@welspun.com') {
-        setTimeout(() => {
-          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-admin-permissions`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-          }).catch((error: unknown) => {
-            console.error('Error granting admin permissions:', error);
-          });
-        }, 0);
-      }
     });
 
     return () => subscription.unsubscribe();
