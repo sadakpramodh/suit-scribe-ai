@@ -11,13 +11,18 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
+  const [approvalChecked, setApprovalChecked] = useState(false);
+
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
+      return;
     }
     
     // Check if user is approved
-    if (!loading && user) {
+    if (!loading && user && !approvalChecked) {
+      let channel: ReturnType<typeof supabase.channel> | null = null;
+
       const checkApproval = async () => {
         const { data, error } = await supabase
           .from("profiles")
@@ -27,12 +32,45 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           
         if (!error && data && !data.approved) {
           navigate('/pending-approval');
+          setApprovalChecked(true);
+          
+          // Set up realtime listener for approval changes
+          channel = supabase
+            .channel(`protected_route_${user.id}`)
+            .on(
+              "postgres_changes",
+              {
+                event: "UPDATE",
+                schema: "public",
+                table: "profiles",
+                filter: `id=eq.${user.id}`,
+              },
+              (payload) => {
+                console.log("User approval changed:", payload);
+                if (payload.new && "approved" in payload.new) {
+                  const newApproved = (payload.new as { approved: boolean }).approved;
+                  if (newApproved) {
+                    // User was approved, navigate to home
+                    navigate('/');
+                  }
+                }
+              }
+            )
+            .subscribe();
+        } else {
+          setApprovalChecked(true);
         }
       };
       
       void checkApproval();
+
+      return () => {
+        if (channel) {
+          void supabase.removeChannel(channel);
+        }
+      };
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, approvalChecked]);
 
   if (loading) {
     return (

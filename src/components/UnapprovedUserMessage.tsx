@@ -13,6 +13,8 @@ export default function UnapprovedUserMessage() {
   const { signOut } = useAuth();
 
   useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
     const checkApproval = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -38,11 +40,12 @@ export default function UnapprovedUserMessage() {
 
       if (data?.approved) {
         navigate("/");
+        return;
       }
 
       // Set up realtime subscription to listen for approval changes
-      const channel = supabase
-        .channel("profile_approval_changes")
+      channel = supabase
+        .channel(`profile_approval_${user.id}`)
         .on(
           "postgres_changes",
           {
@@ -52,6 +55,7 @@ export default function UnapprovedUserMessage() {
             filter: `id=eq.${user.id}`,
           },
           (payload) => {
+            console.log("Approval status changed:", payload);
             if (payload.new && "approved" in payload.new) {
               const newApproved = (payload.new as { approved: boolean }).approved;
               setIsApproved(newApproved);
@@ -62,13 +66,15 @@ export default function UnapprovedUserMessage() {
           }
         )
         .subscribe();
-
-      return () => {
-        void supabase.removeChannel(channel);
-      };
     };
 
     void checkApproval();
+
+    return () => {
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
   }, [navigate]);
 
   const handleSignOut = async () => {
