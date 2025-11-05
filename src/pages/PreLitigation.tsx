@@ -31,8 +31,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import NewDisputeDialog from "@/components/NewDisputeDialog";
+import DisputeDetailsDialog from "@/components/DisputeDetailsDialog";
 import StatCard from "@/components/StatCard";
-import { useDisputes } from "@/hooks/useDisputes";
+import { useDisputes, type Dispute } from "@/hooks/useDisputes";
 import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -40,6 +41,8 @@ import { toast } from "sonner";
 export default function PreLitigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { disputes, loading, deleteDispute, updateDisputeStatus } = useDisputes();
   const { hasPermission } = usePermissions();
 
@@ -154,7 +157,14 @@ export default function PreLitigation() {
                 </TableHeader>
                 <TableBody>
                   {filteredDisputes.map((dispute) => (
-                    <TableRow key={dispute.id} className="transition-colors hover:bg-muted/50">
+                    <TableRow 
+                      key={dispute.id} 
+                      className="transition-colors hover:bg-muted/50 cursor-pointer"
+                      onClick={() => {
+                        setSelectedDispute(dispute);
+                        setDetailsOpen(true);
+                      }}
+                    >
                       <TableCell className="font-medium">{dispute.company}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{dispute.dispute_type}</Badge>
@@ -186,7 +196,7 @@ export default function PreLitigation() {
                         {dispute.responsible_user}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           {hasPermission("delete_dispute") && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -220,6 +230,12 @@ export default function PreLitigation() {
           )}
         </CardContent>
       </Card>
+
+      <DisputeDetailsDialog
+        dispute={selectedDispute}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
 
       <div className="grid gap-6 md:grid-cols-3">
         <StatCard
