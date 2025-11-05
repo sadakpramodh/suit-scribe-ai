@@ -65,12 +65,32 @@ export default function UnapprovedUserMessage() {
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log("Realtime subscription status:", status);
+        });
     };
 
     void checkApproval();
 
+    // Poll every 5 seconds as a fallback
+    const pollInterval = setInterval(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("approved")
+        .eq("id", user.id)
+        .single();
+
+      if (data?.approved) {
+        setIsApproved(true);
+        navigate("/");
+      }
+    }, 5000);
+
     return () => {
+      clearInterval(pollInterval);
       if (channel) {
         void supabase.removeChannel(channel);
       }

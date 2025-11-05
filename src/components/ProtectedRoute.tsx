@@ -56,7 +56,9 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
                 }
               }
             )
-            .subscribe();
+            .subscribe((status) => {
+              console.log("Protected route realtime status:", status);
+            });
         } else {
           setApprovalChecked(true);
         }
