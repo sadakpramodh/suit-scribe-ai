@@ -129,16 +129,37 @@ export const useAdminUsers = () => {
         });
 
       if (error) throw error;
+      
+      return { userId, permission };
+    },
+    onMutate: async ({ userId, permission }) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const previousUsers = queryClient.getQueryData<User[]>(["admin-users"]);
+
+      queryClient.setQueryData<User[]>(["admin-users"], (old) =>
+        old?.map((user) =>
+          user.id === userId
+            ? { ...user, permissions: [...user.permissions, permission] }
+            : user
+        ) ?? []
+      );
+
+      return { previousUsers };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success("Permission granted successfully");
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, _, context) => {
+      if (context?.previousUsers) {
+        queryClient.setQueryData(["admin-users"], context.previousUsers);
+      }
       console.error("Error granting permission:", error);
       const message =
         error instanceof Error ? error.message : "Failed to grant permission";
       toast.error(message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     },
   });
 
@@ -151,16 +172,37 @@ export const useAdminUsers = () => {
         .eq("permission", permission);
 
       if (error) throw error;
+      
+      return { userId, permission };
+    },
+    onMutate: async ({ userId, permission }) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const previousUsers = queryClient.getQueryData<User[]>(["admin-users"]);
+
+      queryClient.setQueryData<User[]>(["admin-users"], (old) =>
+        old?.map((user) =>
+          user.id === userId
+            ? { ...user, permissions: user.permissions.filter((p) => p !== permission) }
+            : user
+        ) ?? []
+      );
+
+      return { previousUsers };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success("Permission revoked successfully");
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, _, context) => {
+      if (context?.previousUsers) {
+        queryClient.setQueryData(["admin-users"], context.previousUsers);
+      }
       console.error("Error revoking permission:", error);
       const message =
         error instanceof Error ? error.message : "Failed to revoke permission";
       toast.error(message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     },
   });
 
@@ -172,16 +214,41 @@ export const useAdminUsers = () => {
         .eq("id", userId);
 
       if (error) throw error;
+      
+      return { userId, approved };
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success(variables.approved ? "User approved successfully" : "User access disabled");
+    onMutate: async ({ userId, approved }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+
+      // Snapshot the previous value
+      const previousUsers = queryClient.getQueryData<User[]>(["admin-users"]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData<User[]>(["admin-users"], (old) =>
+        old?.map((user) =>
+          user.id === userId ? { ...user, approved } : user
+        ) ?? []
+      );
+
+      return { previousUsers };
     },
-    onError: (error: unknown) => {
+    onSuccess: (data) => {
+      toast.success(data.approved ? "User approved successfully" : "User access disabled");
+    },
+    onError: (error: unknown, _, context) => {
+      // Rollback on error
+      if (context?.previousUsers) {
+        queryClient.setQueryData(["admin-users"], context.previousUsers);
+      }
       console.error("Error updating user approval:", error);
       const message =
         error instanceof Error ? error.message : "Failed to update user approval";
       toast.error(message);
+    },
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     },
   });
 
