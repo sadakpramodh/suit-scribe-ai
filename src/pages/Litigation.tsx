@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import {
   useLitigationCases,
+  type LitigationCase,
   type LitigationCaseInsert,
 } from "@/hooks/useLitigationCases";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -27,10 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import LitigationTimelineDialog from "@/components/LitigationTimelineDialog";
 
 export default function Litigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedCase, setSelectedCase] = useState<LitigationCase | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
   const { hasPermission } = usePermissions();
@@ -451,7 +455,14 @@ export default function Litigation() {
                   </TableRow>
                 ) : (
                   filteredCases.map((litigationCase) => (
-                    <TableRow key={litigationCase.id} className="transition-colors hover:bg-muted/50">
+                    <TableRow 
+                      key={litigationCase.id} 
+                      className="transition-colors hover:bg-muted/50 cursor-pointer"
+                      onClick={() => {
+                        setSelectedCase(litigationCase);
+                        setTimelineOpen(true);
+                      }}
+                    >
                       <TableCell className="font-medium">{litigationCase.sr_no || "-"}</TableCell>
                       <TableCell>{litigationCase.parties}</TableCell>
                       <TableCell>
@@ -517,14 +528,22 @@ export default function Litigation() {
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => handleDeleteCase(litigationCase.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCase(litigationCase.id);
+                              }}
                               className="gap-1 text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-3 w-3" />
                               Delete
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <FileText className="h-3 w-3" />
                             Documents
                           </Button>
@@ -612,6 +631,12 @@ export default function Litigation() {
           </CardContent>
         </Card>
       </div>
+
+      <LitigationTimelineDialog
+        litigationCase={selectedCase}
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+      />
     </div>
   );
 }

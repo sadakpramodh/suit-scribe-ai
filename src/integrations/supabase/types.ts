@@ -149,6 +149,50 @@ export type Database = {
         }
         Relationships: []
       }
+      litigation_timeline_events: {
+        Row: {
+          case_id: string
+          created_at: string
+          event_date: string
+          event_title: string
+          hearing_number: number | null
+          id: string
+          stage_type: string
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          event_date: string
+          event_title: string
+          hearing_number?: number | null
+          id?: string
+          stage_type: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          event_date?: string
+          event_title?: string
+          hearing_number?: number | null
+          id?: string
+          stage_type?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "litigation_timeline_events_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "litigation_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           approved: boolean
