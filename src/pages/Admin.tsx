@@ -1,4 +1,5 @@
-import { Shield, UserPlus, UserMinus, CheckCircle, XCircle, UserCheck } from "lucide-react";
+import { useState } from "react";
+import { Shield, UserMinus, CheckCircle, Users } from "lucide-react";
 import { usePermissions, useAdminUsers, Permission } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import DeleteUserDialog from "@/components/DeleteUserDialog";
+import ManageGroupsDialog from "@/components/ManageGroupsDialog";
 
 const PERMISSION_LABELS: Record<Permission, string> = {
   add_dispute: "Add Dispute",
@@ -25,7 +28,10 @@ const PERMISSION_LABELS: Record<Permission, string> = {
 
 export default function Admin() {
   const { isAdmin, isLoading: permissionsLoading } = usePermissions();
-  const { users, isLoading: usersLoading, grantPermission, revokePermission, toggleUserApproval } = useAdminUsers();
+  const { users, isLoading: usersLoading, grantPermission, revokePermission, toggleUserApproval, deleteUser } = useAdminUsers();
+  const [userToDelete, setUserToDelete] = useState<{ id: string; email: string; full_name?: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [groupsDialogOpen, setGroupsDialogOpen] = useState(false);
 
   if (permissionsLoading) {
     return (
@@ -63,6 +69,18 @@ export default function Admin() {
     }
   };
 
+  const handleDeleteUser = (userId: string, reassignToUserId?: string) => {
+    deleteUser.mutate(
+      { userIdToDelete: userId, reassignToUserId },
+      {
+        onSuccess: () => {
+          setDeleteDialogOpen(false);
+          setUserToDelete(null);
+        },
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -70,6 +88,10 @@ export default function Admin() {
           <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
           <p className="mt-1 text-muted-foreground">Manage users and permissions</p>
         </div>
+        <Button onClick={() => setGroupsDialogOpen(true)} variant="outline">
+          <Users className="h-4 w-4 mr-2" />
+          View Groups & Roles
+        </Button>
       </div>
 
       <Card className="shadow-[var(--shadow-card)]">
@@ -92,18 +114,19 @@ export default function Admin() {
                       {label}
                     </TableHead>
                   ))}
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {usersLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading users...
                     </TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -149,6 +172,19 @@ export default function Admin() {
                           </TableCell>
                         );
                       })}
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setUserToDelete(user);
+                            setDeleteDialogOpen(true);
+                          }}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -210,6 +246,20 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      <DeleteUserDialog
+        user={userToDelete}
+        allUsers={users}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteUser}
+        loading={deleteUser.isPending}
+      />
+
+      <ManageGroupsDialog
+        open={groupsDialogOpen}
+        onOpenChange={setGroupsDialogOpen}
+      />
     </div>
   );
 }

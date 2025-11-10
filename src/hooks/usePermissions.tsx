@@ -252,11 +252,73 @@ export const useAdminUsers = () => {
     },
   });
 
+  const deleteUser = useMutation({
+    mutationFn: async ({ 
+      userIdToDelete, 
+      reassignToUserId 
+    }: { 
+      userIdToDelete: string; 
+      reassignToUserId?: string 
+    }) => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error("No active session");
+      }
+
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: {
+          userIdToDelete,
+          reassignToUserId: reassignToUserId === "_none" ? undefined : reassignToUserId,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return { userIdToDelete };
+    },
+    onMutate: async ({ userIdToDelete }) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const previousUsers = queryClient.getQueryData<User[]>(["admin-users"]);
+
+      queryClient.setQueryData<User[]>(["admin-users"], (old) =>
+        old?.filter((user) => user.id !== userIdToDelete) ?? []
+      );
+
+      return { previousUsers };
+    },
+    onSuccess: () => {
+      toast.success("User deleted successfully");
+    },
+    onError: (error: unknown, _, context) => {
+      if (context?.previousUsers) {
+        queryClient.setQueryData(["admin-users"], context.previousUsers);
+      }
+      console.error("Error deleting user:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to delete user";
+      toast.error(message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+  });
+
   return {
     users,
     isLoading,
     grantPermission,
     revokePermission,
     toggleUserApproval,
+    deleteUser,
   };
 };

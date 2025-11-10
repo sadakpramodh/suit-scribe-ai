@@ -8,12 +8,15 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Scale } from "lucide-react";
 
+import ForgotPasswordDialog from "@/components/ForgotPasswordDialog";
+
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -133,18 +136,34 @@ const Auth = () => {
           </Button>
         </form>
 
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-sm text-primary hover:underline"
-          >
-            {isLogin
-              ? "Don't have an account? Sign up"
-              : "Already have an account? Sign in"}
-          </button>
+        <div className="text-center space-y-2">
+          {isLogin && (
+            <button
+              type="button"
+              onClick={() => setForgotPasswordOpen(true)}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              Forgot your password?
+            </button>
+          )}
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-sm text-primary hover:underline"
+            >
+              {isLogin
+                ? "Don't have an account? Sign up"
+                : "Already have an account? Sign in"}
+            </button>
+          </div>
         </div>
       </Card>
+
+      <ForgotPasswordDialog
+        open={forgotPasswordOpen}
+        onOpenChange={setForgotPasswordOpen}
+      />
     </div>
   );
 };
