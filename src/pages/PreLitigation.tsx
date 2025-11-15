@@ -41,6 +41,9 @@ import { toast } from "sonner";
 export default function PreLitigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [subsidiaryFilter, setSubsidiaryFilter] = useState("all");
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const { disputes, loading, deleteDispute, updateDisputeStatus } = useDisputes();
@@ -56,14 +59,33 @@ export default function PreLitigation() {
     return variants[status] || "default";
   };
 
+  const getRiskBadgeVariant = (risk: string | null) => {
+    if (!risk) return "outline";
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+      "high": "destructive",
+      "medium": "secondary",
+      "low": "default",
+    };
+    return variants[risk] || "outline";
+  };
+
+  // Get unique values for filters
+  const uniqueCategories = [...new Set(disputes.map(d => d.category).filter(Boolean))];
+  const uniqueSubsidiaries = [...new Set(disputes.map(d => d.subsidiary).filter(Boolean))];
+
   const filteredDisputes = disputes.filter((dispute) => {
     const matchesSearch =
       dispute.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dispute.dispute_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dispute.responsible_user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dispute.notice_from.toLowerCase().includes(searchQuery.toLowerCase());
+      dispute.notice_from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (dispute.category && dispute.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (dispute.department && dispute.department.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === "all" || dispute.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesRisk = riskFilter === "all" || dispute.risk_rating === riskFilter;
+    const matchesCategory = categoryFilter === "all" || dispute.category === categoryFilter;
+    const matchesSubsidiary = subsidiaryFilter === "all" || dispute.subsidiary === subsidiaryFilter;
+    return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesSubsidiary;
   });
 
   const stats = {
@@ -74,6 +96,11 @@ export default function PreLitigation() {
     }, {} as Record<string, number>),
     byStatus: disputes.reduce((acc, d) => {
       acc[d.status] = (acc[d.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    byRisk: disputes.reduce((acc, d) => {
+      const risk = d.risk_rating || 'unrated';
+      acc[risk] = (acc[risk] || 0) + 1;
       return acc;
     }, {} as Record<string, number>),
   };

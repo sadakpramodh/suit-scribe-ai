@@ -46,49 +46,103 @@ export type Database = {
       }
       disputes: {
         Row: {
+          assigned_legal_officer: string | null
+          brief_facts: string | null
+          category: string | null
+          city: string | null
           company: string
+          company_law_firm: string | null
+          contingent_liability: number | null
           created_at: string
+          department: string | null
           description: string | null
           dispute_type: string
           document_paths: string[] | null
           id: string
           notice_date: string
           notice_from: string
+          opposite_party_law_firm: string | null
+          provision_in_books: number | null
+          receipt_date: string | null
+          relevant_law: string | null
+          relief_sought: string | null
           reply_due_date: string
+          reporting_manager: string | null
           responsible_user: string
+          risk_rating: Database["public"]["Enums"]["risk_rating"] | null
+          state: string | null
           status: string
+          sub_category: string | null
+          subsidiary: string | null
+          unit: string | null
           updated_at: string
           user_id: string
           value: number
         }
         Insert: {
+          assigned_legal_officer?: string | null
+          brief_facts?: string | null
+          category?: string | null
+          city?: string | null
           company: string
+          company_law_firm?: string | null
+          contingent_liability?: number | null
           created_at?: string
+          department?: string | null
           description?: string | null
           dispute_type: string
           document_paths?: string[] | null
           id?: string
           notice_date: string
           notice_from: string
+          opposite_party_law_firm?: string | null
+          provision_in_books?: number | null
+          receipt_date?: string | null
+          relevant_law?: string | null
+          relief_sought?: string | null
           reply_due_date: string
+          reporting_manager?: string | null
           responsible_user: string
+          risk_rating?: Database["public"]["Enums"]["risk_rating"] | null
+          state?: string | null
           status?: string
+          sub_category?: string | null
+          subsidiary?: string | null
+          unit?: string | null
           updated_at?: string
           user_id: string
           value: number
         }
         Update: {
+          assigned_legal_officer?: string | null
+          brief_facts?: string | null
+          category?: string | null
+          city?: string | null
           company?: string
+          company_law_firm?: string | null
+          contingent_liability?: number | null
           created_at?: string
+          department?: string | null
           description?: string | null
           dispute_type?: string
           document_paths?: string[] | null
           id?: string
           notice_date?: string
           notice_from?: string
+          opposite_party_law_firm?: string | null
+          provision_in_books?: number | null
+          receipt_date?: string | null
+          relevant_law?: string | null
+          relief_sought?: string | null
           reply_due_date?: string
+          reporting_manager?: string | null
           responsible_user?: string
+          risk_rating?: Database["public"]["Enums"]["risk_rating"] | null
+          state?: string | null
           status?: string
+          sub_category?: string | null
+          subsidiary?: string | null
+          unit?: string | null
           updated_at?: string
           user_id?: string
           value?: number
@@ -98,52 +152,124 @@ export type Database = {
       litigation_cases: {
         Row: {
           amount_involved: number | null
+          authorized_signatory: string | null
+          bench: string | null
+          case_type: Database["public"]["Enums"]["case_type"] | null
+          case_year: number | null
+          city: string | null
+          cnr_number: string | null
+          company_law_firm: string | null
+          contingent_liability: number | null
+          court_type: Database["public"]["Enums"]["court_type"] | null
           created_at: string
+          district: string | null
           forum: string
           id: string
+          interest_amount: number | null
+          issues: string | null
+          kmp_involved: boolean | null
           last_hearing_date: string | null
+          legal_nature: string | null
+          legal_sub_nature: string | null
           next_hearing_date: string | null
+          opposite_party_law_firm: string | null
           particular: string | null
           parties: string
+          penalties: number | null
+          prayers: string | null
+          provision_in_books: number | null
+          region: string | null
           remarks: string | null
+          risk_rating: Database["public"]["Enums"]["risk_rating"] | null
           sr_no: number | null
           start_date: string | null
+          state: string | null
           status: string
+          subsidiary: string | null
           treatment_resolution: string | null
+          unit: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount_involved?: number | null
+          authorized_signatory?: string | null
+          bench?: string | null
+          case_type?: Database["public"]["Enums"]["case_type"] | null
+          case_year?: number | null
+          city?: string | null
+          cnr_number?: string | null
+          company_law_firm?: string | null
+          contingent_liability?: number | null
+          court_type?: Database["public"]["Enums"]["court_type"] | null
           created_at?: string
+          district?: string | null
           forum: string
           id?: string
+          interest_amount?: number | null
+          issues?: string | null
+          kmp_involved?: boolean | null
           last_hearing_date?: string | null
+          legal_nature?: string | null
+          legal_sub_nature?: string | null
           next_hearing_date?: string | null
+          opposite_party_law_firm?: string | null
           particular?: string | null
           parties: string
+          penalties?: number | null
+          prayers?: string | null
+          provision_in_books?: number | null
+          region?: string | null
           remarks?: string | null
+          risk_rating?: Database["public"]["Enums"]["risk_rating"] | null
           sr_no?: number | null
           start_date?: string | null
+          state?: string | null
           status?: string
+          subsidiary?: string | null
           treatment_resolution?: string | null
+          unit?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount_involved?: number | null
+          authorized_signatory?: string | null
+          bench?: string | null
+          case_type?: Database["public"]["Enums"]["case_type"] | null
+          case_year?: number | null
+          city?: string | null
+          cnr_number?: string | null
+          company_law_firm?: string | null
+          contingent_liability?: number | null
+          court_type?: Database["public"]["Enums"]["court_type"] | null
           created_at?: string
+          district?: string | null
           forum?: string
           id?: string
+          interest_amount?: number | null
+          issues?: string | null
+          kmp_involved?: boolean | null
           last_hearing_date?: string | null
+          legal_nature?: string | null
+          legal_sub_nature?: string | null
           next_hearing_date?: string | null
+          opposite_party_law_firm?: string | null
           particular?: string | null
           parties?: string
+          penalties?: number | null
+          prayers?: string | null
+          provision_in_books?: number | null
+          region?: string | null
           remarks?: string | null
+          risk_rating?: Database["public"]["Enums"]["risk_rating"] | null
           sr_no?: number | null
           start_date?: string | null
+          state?: string | null
           status?: string
+          subsidiary?: string | null
           treatment_resolution?: string | null
+          unit?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -296,6 +422,22 @@ export type Database = {
         | "delete_users"
         | "export_reports"
       app_role: "admin" | "legal_head" | "legal_counsel" | "user"
+      case_type:
+        | "civil"
+        | "criminal"
+        | "labour"
+        | "regulatory"
+        | "tax"
+        | "intellectual_property"
+        | "corporate"
+      court_type:
+        | "high_court"
+        | "district_court"
+        | "magistrate_court"
+        | "supreme_court"
+        | "tribunal"
+        | "arbitration"
+      risk_rating: "high" | "medium" | "low"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -432,6 +574,24 @@ export const Constants = {
         "export_reports",
       ],
       app_role: ["admin", "legal_head", "legal_counsel", "user"],
+      case_type: [
+        "civil",
+        "criminal",
+        "labour",
+        "regulatory",
+        "tax",
+        "intellectual_property",
+        "corporate",
+      ],
+      court_type: [
+        "high_court",
+        "district_court",
+        "magistrate_court",
+        "supreme_court",
+        "tribunal",
+        "arbitration",
+      ],
+      risk_rating: ["high", "medium", "low"],
     },
   },
 } as const

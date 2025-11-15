@@ -8,11 +8,36 @@ export interface LitigationCase {
   sr_no: number | null;
   parties: string;
   forum: string;
+  subsidiary: string | null;
+  unit: string | null;
+  region: string | null;
+  case_type: 'civil' | 'criminal' | 'labour' | 'regulatory' | 'tax' | 'intellectual_property' | 'corporate' | null;
+  case_year: number | null;
+  cnr_number: string | null;
+  court_type: 'high_court' | 'district_court' | 'magistrate_court' | 'supreme_court' | 'tribunal' | 'arbitration' | null;
+  state: string | null;
+  city: string | null;
+  district: string | null;
+  bench: string | null;
   particular: string | null;
+  brief_facts: string | null;
+  issues: string | null;
+  prayers: string | null;
+  legal_nature: string | null;
+  legal_sub_nature: string | null;
+  kmp_involved: boolean | null;
+  authorized_signatory: string | null;
   start_date: string | null;
   last_hearing_date: string | null;
   next_hearing_date: string | null;
   amount_involved: number | null;
+  interest_amount: number | null;
+  penalties: number | null;
+  provision_in_books: number | null;
+  contingent_liability: number | null;
+  company_law_firm: string | null;
+  opposite_party_law_firm: string | null;
+  risk_rating: 'high' | 'medium' | 'low' | null;
   treatment_resolution: string | null;
   remarks: string | null;
   status: string;
@@ -20,10 +45,16 @@ export interface LitigationCase {
   updated_at: string;
 }
 
-export type LitigationCaseInsert = Omit<
+export type LitigationCaseInsert = Partial<Omit<
   LitigationCase,
   "id" | "user_id" | "created_at" | "updated_at"
->;
+>> & {
+  // Required fields from original schema
+  sr_no?: number | null;
+  parties: string;
+  forum: string;
+  status: string;
+};
 
 export const useLitigationCases = () => {
   const [cases, setCases] = useState<LitigationCase[]>([]);
